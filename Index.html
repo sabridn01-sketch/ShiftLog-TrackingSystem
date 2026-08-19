@@ -429,7 +429,13 @@
             .cal-day { min-height: 52px; font-size: 11px; padding: 4px 2px; }
             .cal-shift-badge { font-size: 8.5px; }
         }
-    </style>
+    
+        .btn-status-option:disabled {
+            opacity: 0.6;
+            cursor: wait;
+            transform: none !important;
+        }
+</style>
 </head>
 <body>
 
@@ -1074,45 +1080,153 @@
     }
 
     async function submitStatusPilihan(statusPilihan) {
-        if (!selectedDateKey) return;
-        let dateKey = selectedDateKey;
-        tutupModalStatus();
-
-        let dateObj = parseLocalDate(dateKey);
-        let namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][dateObj.getDay()];
-        let indexHari = dateObj.getDay(); 
-        let shift = hitungShiftOtomatis(dateObj);
-        let isTanggalMerah = LIBUR_NASIONAL_OTOMATIS[dateKey] ? true : false;
-
-        let totalLembur = 0;
-        let jamKerja = "0:00";
-
-        if (statusPilihan === "Hadir") {
-            jamKerja = "8.5 Jam";
-            if (indexHari === 0 || isTanggalMerah) {
-                totalLembur = (shift === "Pagi" || shift === "Siang") ? 17 : 19;
-            } else if (indexHari === 6) {
-                totalLembur = 5.5;
-            } else {
-                totalLembur = (shift === "Pagi" || shift === "Siang") ? 1.5 : 3.5;
-            }
-        } else if (statusPilihan === "Sakit" || statusPilihan === "Cuti") {
-            jamKerja = "8 Jam";
-            totalLembur = 0;
+        if (!selectedDateKey) {
+            alert("Tanggal belum dipilih.");
+            return;
         }
 
-        if (statusPilihan !== "Hapus") {
-            await simpanDataFirebase({
-                tanggal: dateKey,
-                hari: namaHari,
-                shift: shift,
-                status: statusPilihan,
-                jamKerja: jamKerja,
-                lembur: totalLembur,
-                userId: currentUserId
+        const dateKey = selectedDateKey;
+
+        // Ambil tombol status
+        const statusButtons = [
+            document.getElementById('btnOptHadir'),
+            document.getElementById('btnOptSakit'),
+            document.getElementById('btnOptCuti'),
+            document.getElementById('btnOptHapus')
+        ].filter(Boolean);
+
+        // Cegah double click saat menyimpan
+        statusButtons.forEach(btn => {
+            btn.disabled = true;
+        });
+
+        try {
+            const dateObj = parseLocalDate(dateKey);
+
+            if (isNaN(dateObj.getTime())) {
+                throw new Error("Format tanggal tidak valid: " + dateKey);
+            }
+
+            const namaHari = [
+                'Minggu',
+                'Senin',
+                'Selasa',
+                'Rabu',
+                'Kamis',
+                'Jumat',
+                'Sabtu'
+            ][dateObj.getDay()];
+
+            const indexHari = dateObj.getDay();
+            const shift = hitungShiftOtomatis(dateObj);
+
+            const isTanggalMerah =
+                LIBUR_NASIONAL_OTOMATIS[dateKey] ? true : false;
+
+            let totalLembur = 0;
+            let jamKerja = "0:00";
+
+            // ==========================================
+            // STATUS HADIR
+            // ==========================================
+            if (statusPilihan === "Hadir") {
+
+                jamKerja = "8.5 Jam";
+
+                if (indexHari === 0 || isTanggalMerah) {
+
+                    totalLembur =
+                        (shift === "Pagi" || shift === "Siang")
+                            ? 17
+                            : 19;
+
+                } else if (indexHari === 6) {
+
+                    totalLembur = 5.5;
+
+                } else {
+
+                    totalLembur =
+                        (shift === "Pagi" || shift === "Siang")
+                            ? 1.5
+                            : 3.5;
+                }
+
+            // ==========================================
+            // STATUS SAKIT / CUTI
+            // ==========================================
+            } else if (
+                statusPilihan === "Sakit" ||
+                statusPilihan === "Cuti"
+            ) {
+
+                jamKerja = "8 Jam";
+                totalLembur = 0;
+            }
+
+            // ==========================================
+            // SIMPAN / HAPUS DATA FIREBASE
+            // ==========================================
+            if (statusPilihan === "Hapus") {
+
+                await hapusDataFirebase(
+                    dateKey,
+                    currentUserId
+                );
+
+            } else {
+
+                if (!currentUserId || currentUserId.trim() === "") {
+                    throw new Error(
+                        "User ID / Nama belum diisi."
+                    );
+                }
+
+                await simpanDataFirebase({
+                    tanggal: dateKey,
+                    hari: namaHari,
+                    shift: shift,
+                    status: statusPilihan,
+                    jamKerja: jamKerja,
+                    lembur: totalLembur,
+                    userId: currentUserId
+                });
+            }
+
+            // ==========================================
+            // BERHASIL
+            // ==========================================
+            tutupModalStatus();
+
+            // Dengarkan ulang data Firebase agar
+            // kalender + tabel + gaji langsung update.
+            listenToFirestoreData();
+
+        } catch (error) {
+
+            console.error(
+                "Gagal menyimpan status absensi:",
+                error
+            );
+
+            alert(
+                "Gagal menyimpan status " +
+                statusPilihan +
+                ".\n\n" +
+                "Pesan error:\n" +
+                (error && error.message
+                    ? error.message
+                    : error)
+            );
+
+            // Modal tetap terbuka agar user dapat mencoba lagi.
+
+        } finally {
+
+            // Aktifkan kembali semua tombol
+            statusButtons.forEach(btn => {
+                btn.disabled = false;
             });
-        } else {
-            await hapusDataFirebase(dateKey, currentUserId);
         }
     }
 
