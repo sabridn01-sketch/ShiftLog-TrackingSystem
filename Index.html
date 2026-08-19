@@ -422,6 +422,12 @@
         .btn-status-hapus { border-color: #FECACA; color: #DC2626; background: #FEF2F2; }
         .btn-status-batal { border: none; color: var(--text-muted); background: transparent; font-weight: 500; margin-top: 6px; }
 
+        .btn-status-option:disabled {
+            opacity: 0.6;
+            cursor: wait;
+            transform: none !important;
+        }
+
         @media (max-width: 650px) {
             .container { padding: 18px 14px; }
             .gaji-grid { grid-template-columns: 1fr; gap: 14px; }
@@ -429,13 +435,7 @@
             .cal-day { min-height: 52px; font-size: 11px; padding: 4px 2px; }
             .cal-shift-badge { font-size: 8.5px; }
         }
-    
-        .btn-status-option:disabled {
-            opacity: 0.6;
-            cursor: wait;
-            transform: none !important;
-        }
-</style>
+    </style>
 </head>
 <body>
 
@@ -1087,7 +1087,6 @@
 
         const dateKey = selectedDateKey;
 
-        // Ambil tombol status
         const statusButtons = [
             document.getElementById('btnOptHadir'),
             document.getElementById('btnOptSakit'),
@@ -1095,10 +1094,7 @@
             document.getElementById('btnOptHapus')
         ].filter(Boolean);
 
-        // Cegah double click saat menyimpan
-        statusButtons.forEach(btn => {
-            btn.disabled = true;
-        });
+        statusButtons.forEach(btn => { btn.disabled = true; });
 
         try {
             const dateObj = parseLocalDate(dateKey);
@@ -1107,79 +1103,33 @@
                 throw new Error("Format tanggal tidak valid: " + dateKey);
             }
 
-            const namaHari = [
-                'Minggu',
-                'Senin',
-                'Selasa',
-                'Rabu',
-                'Kamis',
-                'Jumat',
-                'Sabtu'
-            ][dateObj.getDay()];
-
+            const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][dateObj.getDay()];
             const indexHari = dateObj.getDay();
             const shift = hitungShiftOtomatis(dateObj);
-
-            const isTanggalMerah =
-                LIBUR_NASIONAL_OTOMATIS[dateKey] ? true : false;
+            const isTanggalMerah = LIBUR_NASIONAL_OTOMATIS[dateKey] ? true : false;
 
             let totalLembur = 0;
             let jamKerja = "0:00";
 
-            // ==========================================
-            // STATUS HADIR
-            // ==========================================
             if (statusPilihan === "Hadir") {
-
                 jamKerja = "8.5 Jam";
-
                 if (indexHari === 0 || isTanggalMerah) {
-
-                    totalLembur =
-                        (shift === "Pagi" || shift === "Siang")
-                            ? 17
-                            : 19;
-
+                    totalLembur = (shift === "Pagi" || shift === "Siang") ? 17 : 19;
                 } else if (indexHari === 6) {
-
                     totalLembur = 5.5;
-
                 } else {
-
-                    totalLembur =
-                        (shift === "Pagi" || shift === "Siang")
-                            ? 1.5
-                            : 3.5;
+                    totalLembur = (shift === "Pagi" || shift === "Siang") ? 1.5 : 3.5;
                 }
-
-            // ==========================================
-            // STATUS SAKIT / CUTI
-            // ==========================================
-            } else if (
-                statusPilihan === "Sakit" ||
-                statusPilihan === "Cuti"
-            ) {
-
+            } else if (statusPilihan === "Sakit" || statusPilihan === "Cuti") {
                 jamKerja = "8 Jam";
                 totalLembur = 0;
             }
 
-            // ==========================================
-            // SIMPAN / HAPUS DATA FIREBASE
-            // ==========================================
             if (statusPilihan === "Hapus") {
-
-                await hapusDataFirebase(
-                    dateKey,
-                    currentUserId
-                );
-
+                await hapusDataFirebase(dateKey, currentUserId);
             } else {
-
                 if (!currentUserId || currentUserId.trim() === "") {
-                    throw new Error(
-                        "User ID / Nama belum diisi."
-                    );
+                    throw new Error("User ID / Nama belum diisi.");
                 }
 
                 await simpanDataFirebase({
@@ -1193,40 +1143,14 @@
                 });
             }
 
-            // ==========================================
-            // BERHASIL
-            // ==========================================
             tutupModalStatus();
-
-            // Dengarkan ulang data Firebase agar
-            // kalender + tabel + gaji langsung update.
             listenToFirestoreData();
 
         } catch (error) {
-
-            console.error(
-                "Gagal menyimpan status absensi:",
-                error
-            );
-
-            alert(
-                "Gagal menyimpan status " +
-                statusPilihan +
-                ".\n\n" +
-                "Pesan error:\n" +
-                (error && error.message
-                    ? error.message
-                    : error)
-            );
-
-            // Modal tetap terbuka agar user dapat mencoba lagi.
-
+            console.error("Gagal menyimpan status absensi:", error);
+            alert("Gagal menyimpan status " + statusPilihan + ".\n\nPesan error:\n" + (error && error.message ? error.message : error));
         } finally {
-
-            // Aktifkan kembali semua tombol
-            statusButtons.forEach(btn => {
-                btn.disabled = false;
-            });
+            statusButtons.forEach(btn => { btn.disabled = false; });
         }
     }
 
@@ -1257,9 +1181,9 @@
             let dateObj = parseLocalDate(tglStr);
 
             if (isNaN(dateObj.getTime())) continue;
-            if (dateObj < periode.startDate || dateObj > periode.endDate) continue;
 
-            barisDitemukan++;
+            let masukPeriodeCutoff = (dateObj >= periode.startDate && dateObj <= periode.endDate);
+
             let hari = data[i][1];
             let shift = data[i][2];
             let status = data[i][3];
@@ -1268,36 +1192,40 @@
             let nominalLemburBaris = Math.round(lembur * tarifLemburRate);
 
             let dateKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-            totalJamLembur += lembur;
-            if (status === "Hadir") { totalHadir++; }
 
-            let day = dateObj.getDay();
-            let monday = new Date(new Date(dateObj).setDate(dateObj.getDate() - day + (day === 0 ? -6 : 1)));
-            let weekKey = `${monday.getFullYear()}-${monday.getMonth() + 1}-${monday.getDate()}`;
+            if (masukPeriodeCutoff) {
+                barisDitemukan++;
+                totalJamLembur += lembur;
+                if (status === "Hadir") { totalHadir++; }
 
-            if (!mingguKerja[weekKey]) mingguKerja[weekKey] = { aktifKerja: false, adaAbsen: false };
-            if (status === "Absen") mingguKerja[weekKey].adaAbsen = true;
-            else if (status === "Hadir" || status === "Sakit" || status === "Cuti") mingguKerja[weekKey].aktifKerja = true;
+                let day = dateObj.getDay();
+                let monday = new Date(new Date(dateObj).setDate(dateObj.getDate() - day + (day === 0 ? -6 : 1)));
+                let weekKey = `${monday.getFullYear()}-${monday.getMonth() + 1}-${monday.getDate()}`;
 
-            let badgeClass = "status-hadir";
-            if (status === "Absen") badgeClass = "status-absen";
-            if (status === "LBR") badgeClass = "status-lbr";
-            if (status === "Sakit") badgeClass = "status-sakit";
-            if (status === "Cuti") badgeClass = "status-cuti";
+                if (!mingguKerja[weekKey]) mingguKerja[weekKey] = { aktifKerja: false, adaAbsen: false };
+                if (status === "Absen") mingguKerja[weekKey].adaAbsen = true;
+                else if (status === "Hadir" || status === "Sakit" || status === "Cuti") mingguKerja[weekKey].aktifKerja = true;
 
-            let isLibur = (day === 0 || hari === "Minggu" || status === "LBR" || lembur === 17 || lembur === 19 || LIBUR_NASIONAL_OTOMATIS[dateKey]);
-            let classBaris = isLibur ? 'class="row-libur"' : '';
-            let lemburTeks = lembur > 0 ? `${lembur.toString().replace('.', ',')} (${formatRupiah.format(nominalLemburBaris)})` : "0";
+                let badgeClass = "status-hadir";
+                if (status === "Absen") badgeClass = "status-absen";
+                if (status === "LBR") badgeClass = "status-lbr";
+                if (status === "Sakit") badgeClass = "status-sakit";
+                if (status === "Cuti") badgeClass = "status-cuti";
 
-            html += `<tr ${classBaris}>
-                <td style="text-align: center; font-weight: 600;">${barisDitemukan}</td>
-                <td>${formatKeDDMMYYYY(tglStr)}</td>
-                <td><strong>${hari}</strong></td>
-                <td>${shift}</td>
-                <td><span class="status-badge ${badgeClass}">${status}</span></td>
-                <td>${jamKerja}</td>
-                <td><strong>${lemburTeks}</strong></td>
-            </tr>`;
+                let isLibur = (day === 0 || hari === "Minggu" || status === "LBR" || lembur === 17 || lembur === 19 || LIBUR_NASIONAL_OTOMATIS[dateKey]);
+                let classBaris = isLibur ? 'class="row-libur"' : '';
+                let lemburTeks = lembur > 0 ? `${lembur.toString().replace('.', ',')} (${formatRupiah.format(nominalLemburBaris)})` : "0";
+
+                html += `<tr ${classBaris}>
+                    <td style="text-align: center; font-weight: 600;">${barisDitemukan}</td>
+                    <td>${formatKeDDMMYYYY(tglStr)}</td>
+                    <td><strong>${hari}</strong></td>
+                    <td>${shift}</td>
+                    <td><span class="status-badge ${badgeClass}">${status}</span></td>
+                    <td>${jamKerja}</td>
+                    <td><strong>${lemburTeks}</strong></td>
+                </tr>`;
+            }
         }
         
         html += '</table>';
