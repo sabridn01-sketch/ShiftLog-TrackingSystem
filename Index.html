@@ -664,7 +664,7 @@
     import { getFirestore, doc, setDoc, deleteDoc, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // ------------------------------------------------------------------
-    // KONFIGURASI FIREBASE ANDA
+    // KONFIGURASI FIREBASE FIRESTORE
     // ------------------------------------------------------------------
     const firebaseConfig = {
         apiKey: "AIzaSyDdNEtOgFhXdgGQG33wDyy7tD9rdfw5qnY",
@@ -891,15 +891,11 @@
         localStorage.setItem('lastSelectedMonth', month);
         localStorage.setItem('lastSelectedYear', year);
 
-        calViewMonth = month;
-        calViewYear = year;
-
         let periode = getPeriodeCutoff(year, month);
         document.getElementById('labelPeriodeCutoff').innerText = 
             "Periode Cut-Off: " + formatTanggalIndo(periode.startDate) + " - " + formatTanggalIndo(periode.endDate);
 
         tampilkanTabelDanSiapkanGaji(cachedDataSpreadsheet);
-        renderKalenderBulananStandar();
     }
 
     function geserBulanKalender(delta) {
@@ -1282,6 +1278,7 @@
     document.addEventListener("DOMContentLoaded", function() {
         inisialisasiFilterPeriode();
         CekAtauMintaUserId();
+        renderKalenderBulananStandar();
         ubahPeriode();
 
         document.getElementById('btnChangeUser').onclick = bukaModalIdentitas;
